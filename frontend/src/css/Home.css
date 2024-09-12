@@ -3,8 +3,8 @@ body {
 }
 .main {
     display: flex;
-    justify-content: center; /* 水平居中 */
-    align-items: center; /* 垂直居中 */
-    gap: 200px; /* 两个 div 之间的间距 */
-    height: 100vh; /* 使 .main 高度占满整个视口 */
+    justify-content: center;
+    align-items: center;
+    gap: 200px;
+    height: 100vh;
 }
