@@ -13,6 +13,7 @@
 
 啟動後端
 - daphne -p 8000 FireDetection.asgi:application
+- daphne -p 8000 -b 0.0.0.0 FireDetection.asgi:application
 啟動 redis 作為 Channels 的後端
 - redis-server
 
