@@ -4,6 +4,22 @@ import base64
 import asyncio
 import numpy as np
 from channels.generic.websocket import AsyncWebsocketConsumer
+import time
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+def connect_stream(url=None, max_retries=3):
+    if url is None:
+        url = os.getenv('STREAM_URL')
+    for attempt in range(max_retries):
+        print(f"嘗試連接串流 (第 {attempt + 1} 次)")
+        cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+        if cap.isOpened():
+            return cap
+        time.sleep(1)
+    return None
 
 class LiveFeedConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -18,28 +34,31 @@ class LiveFeedConsumer(AsyncWebsocketConsumer):
         await self.close()
 
     async def stream_video(self):
-        rtsp_url = 'rtsp://192.168.177.2:554'
-        cap = cv2.VideoCapture(rtsp_url)
-
-        if not cap.isOpened():
-            await self.send("Could not open RTSP stream.")
-            return
-
+        rtsp_url = 'rtsp://192.168.177.142:554'
+        cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
+        
+        # 設置低延遲參數
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        
         try:
             while self.is_streaming:
                 ret, frame = cap.read()
                 if not ret:
-                    break
+                    continue
 
-                # 將影像壓縮成 JPEG 格式
-                _, buffer = cv2.imencode('.jpg', frame)
-                # 編碼成 base64 字串以便傳輸
+                # 降低解析度
+                frame = cv2.resize(frame, (1280, 720))
+                
+                # 降低 JPEG 品質以減少傳輸量
+                encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 80]
+                _, buffer = cv2.imencode('.jpg', frame, encode_param)
+                
                 frame_data = base64.b64encode(buffer).decode('utf-8')
-
-                # 發送影像資料到前端
                 await self.send(text_data=frame_data)
-                # 控制幀率
-                await asyncio.sleep(0.03)  # 約 30 FPS
+                
+                # 減少等待時間
+                await asyncio.sleep(0.01)  # 提高更新頻率
+                
         except asyncio.CancelledError:
             pass
         finally:
