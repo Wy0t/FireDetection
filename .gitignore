@@ -1,5 +1,7 @@
 .venv
 .env
+media
+server
 # Ignore Python cache
 __pycache__/
 *.py[cod]

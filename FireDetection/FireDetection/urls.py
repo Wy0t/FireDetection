@@ -3,7 +3,7 @@ from django.conf.urls.static import static
 from django.urls import path, include
 
 urlpatterns = [
-    path("detection/", include("detection.urls")),  # 引入 app 的路由
+    path("api/", include("detection.urls")),  # 引入 app 的路由
 ]
 
 # 添加靜態文件路由支持

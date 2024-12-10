@@ -136,6 +136,7 @@ ASGI_APPLICATION = 'FireDetection.asgi.application'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')  # 文件存儲目錄
+SERVER_ROOT = os.path.join(BASE_DIR, 'server')  # 文件存儲目錄
 
 
 

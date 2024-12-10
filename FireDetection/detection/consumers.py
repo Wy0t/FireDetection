@@ -1,6 +1,5 @@
 import json
 import os
-import asyncio
 from channels.generic.websocket import AsyncWebsocketConsumer
 from aiortc import RTCPeerConnection, RTCSessionDescription
 from aiortc.contrib.media import MediaPlayer
@@ -60,6 +59,11 @@ class WebRTCConsumer(AsyncWebsocketConsumer):
                         options={
                             'rtsp_transport': 'tcp',
                             'fflags': 'nobuffer',
+                            'rw_timeout': '5000000',        # 5秒讀寫逾時
+                            'reconnect': '1',               # 重連
+                            'reconnect_streamed': '1',      # 重連串流
+                            'reconnect_delay_max': '10',     # 最大重連延遲
+                            'max_delay': '500000'           # 0.5秒延遲緩衝
                         }
                     )
                     
