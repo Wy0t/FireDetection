@@ -100,3 +100,26 @@ class WebRTCConsumer(AsyncWebsocketConsumer):
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.cleanup()
+
+class AlertConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.group_name = "alert_group"
+
+        # 加入群組
+        await self.channel_layer.group_add(self.group_name, self.channel_name)
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        # 離開群組
+        await self.channel_layer.group_discard(self.group_name, self.channel_name)
+
+    # 接收推送的訊息
+    async def alert_message(self, event):
+        message = event['message']
+        image_base64 = event['image']
+
+        # 發送給前端
+        await self.send(text_data=json.dumps({
+            'message': message,
+            'image': image_base64
+        }))

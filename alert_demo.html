@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alert System</title>
+</head>
+<body>
+    <h1>警示系統</h1>
+    <div id="alertMessage" style="color: red; font-size: 20px;"></div>
+    <img id="alertImage" src="" alt="警示圖片" style="max-width: 600px; display: none;">
+
+    <script>
+        // 建立 WebSocket 連接
+        const socket = new WebSocket("ws://26.244.63.82:8000/ws/alerts/");
+
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            const message = data.message;
+            const imageBase64 = data.image;
+
+            // 顯示警示訊息
+            document.getElementById("alertMessage").innerText = message;
+
+            // 顯示圖片
+            const imageElement = document.getElementById("alertImage");
+            imageElement.src = "data:image/jpeg;base64," + imageBase64;
+            imageElement.style.display = "block";
+        };
+
+        socket.onclose = function() {
+            console.log("WebSocket connection closed");
+        };
+    </script>
+</body>
+</html>

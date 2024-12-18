@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>即時串流測試</title>
+<style>
+  body {
+    background-color: #333;
+    color: #fff;
+    font-family: Arial, sans-serif;
+    text-align: center;
+  }
+  video {
+    width: 80%;
+    max-width: 800px;
+    margin-top: 50px;
+    background: #000;
+  }
+  #status {
+    margin-top: 20px;
+  }
+  button {
+    margin-top: 30px;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<h1>即時串流檢視器</h1>
+<video id="video" playsinline autoplay></video>
+<div id="status">狀態：未連接</div>
+<button id="startBtn">開始播放</button>
+
+<script>
+let ws;
+let pc;
+const videoElement = document.getElementById('video');
+const statusEl = document.getElementById('status');
+const startBtn = document.getElementById('startBtn');
+
+// 使用者點擊按鈕才開始連線和協商
+startBtn.addEventListener('click', () => {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    ws = new WebSocket('ws://26.244.63.82:8000/ws/webrtc/'); // 根據你的實際路徑修改
+    
+    ws.addEventListener('open', () => {
+      console.log("WebSocket 已連接");
+      statusEl.textContent = "狀態：WebSocket 已連接，等待建立 Offer...";
+      createOffer();
+    });
+
+    ws.addEventListener('message', async (event) => {
+      const data = JSON.parse(event.data);
+
+      if(data.type === 'answer' && pc) {
+        console.log("收到 answer，設定 remoteDescription");
+        await pc.setRemoteDescription({type: 'answer', sdp: data.sdp});
+        statusEl.textContent = "狀態：已獲得 Answer，建立連線中...";
+      }
+
+      if(data.type === 'error') {
+        console.error("後端錯誤：", data.message);
+        statusEl.textContent = "狀態：發生錯誤：" + data.message;
+      }
+    });
+
+    ws.addEventListener('close', () => {
+      console.log("WebSocket 已關閉");
+      statusEl.textContent = "狀態：WebSocket 已關閉";
+    });
+  }
+});
+
+async function createOffer() {
+  pc = new RTCPeerConnection();
+
+  // 增加 video 接收 transceiver，使 offer 中包含 video m-line
+  pc.addTransceiver("video", { direction: "recvonly" });
+
+  // 接收到媒體軌時處理
+  pc.addEventListener('track', event => {
+    console.log("收到 track");
+    if (videoElement.srcObject !== event.streams[0]) {
+      videoElement.srcObject = event.streams[0];
+      console.log("成功接收到視訊串流，嘗試播放...");
+
+      videoElement.play().then(() => {
+        console.log("影片播放中");
+      }).catch(e => {
+        console.error("影片播放時發生錯誤：", e);
+        statusEl.textContent = "狀態：無法自動播放，請嘗試點擊播放";
+      });
+      
+      statusEl.textContent = "狀態：已收到視訊串流";
+    }
+  });
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+
+  console.log("送出 offer");
+  ws.send(JSON.stringify({ type: 'offer', sdp: offer.sdp }));
+  statusEl.textContent = "狀態：已送出 Offer，等待 Answer...";
+}
+</script>
+
+</body>
+</html>
