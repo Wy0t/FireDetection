@@ -14,19 +14,31 @@ class UploadImageView(APIView):
     parser_classes = [MultiPartParser]
 
     def post(self, request):
-        file_obj = request.data['file']
+        files = request.FILES.getlist('file')  # 獲取多個檔案的列表
         upload_dir = settings.MEDIA_ROOT  # 使用 MEDIA_ROOT
         if not os.path.exists(upload_dir):
             os.makedirs(upload_dir)  # 確保目錄存在
 
-        file_path = os.path.join(upload_dir, file_obj.name)
+        allowed_mime_types = ["image/jpeg", "image/png", "image/gif"]  # 允許的 MIME 類型
+        uploaded_files = []
 
-        # 保存文件
-        with open(file_path, "wb+") as f:
-            for chunk in file_obj.chunks():
-                f.write(chunk)
+        for file_obj in files:
+            if file_obj.content_type not in allowed_mime_types:  # 檢查 MIME 類型
+                return Response(
+                    {"status": "error", "message": f"Unsupported file type: {file_obj.content_type}"},
+                    status=400,
+                )
 
-        return Response({"status": "success", "file_path": file_path})
+            file_path = os.path.join(upload_dir, file_obj.name)
+
+            # 保存文件
+            with open(file_path, "wb+") as f:
+                for chunk in file_obj.chunks():
+                    f.write(chunk)
+
+            uploaded_files.append(file_path)
+
+        return Response({"status": "success"})  # 回傳所有上傳的檔案路徑
     
 class AlertView(APIView):
     parser_classes = [MultiPartParser]

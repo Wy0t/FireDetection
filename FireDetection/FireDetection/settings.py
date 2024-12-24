@@ -41,10 +41,12 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'channels',
     'detection',
-    'rest_framework'
+    'rest_framework',
+    'corsheaders'
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -139,6 +141,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')  # 文件存儲目錄
 SERVER_ROOT = os.path.join(BASE_DIR, 'server')  # 文件存儲目錄
 
 
+CORS_ALLOW_ALL_ORIGINS = True
 
 
 CHANNEL_LAYERS = {

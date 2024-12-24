@@ -1,7 +1,9 @@
+import asyncio
 import json
 import os
+import socket
 from channels.generic.websocket import AsyncWebsocketConsumer
-from aiortc import RTCPeerConnection, RTCSessionDescription
+from aiortc import RTCPeerConnection, RTCSessionDescription, RTCConfiguration, RTCIceServer
 from aiortc.contrib.media import MediaPlayer
 from dotenv import load_dotenv
 
@@ -28,12 +30,12 @@ class WebRTCConsumer(AsyncWebsocketConsumer):
                 print("關閉 RTCPeerConnection")
                 await self.pc.close()
                 self.pc = None
-            
+
             if self.player:
                 print("關閉 MediaPlayer")
                 self.player.video.stop()
                 self.player = None
-                
+
         except Exception as e:
             print(f"清理資源時發生錯誤: {str(e)}")
         finally:
@@ -42,50 +44,54 @@ class WebRTCConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data):
         try:
             data = json.loads(text_data)
-            
+
             if data['type'] == 'offer':
                 print("收到 offer")
                 await self.cleanup()
-                
-                self.pc = RTCPeerConnection()
-                
+
+                # 初始化 RTCPeerConnection 並使用封裝的配置
+                configuration = RTCConfiguration(iceServers=[
+                    RTCIceServer(urls="stun:stun.l.google.com:19302"),
+                    RTCIceServer(urls="stun:stun1.l.google.com:19302"),
+                    RTCIceServer(urls="stun:stun2.l.google.com:19302"),
+                    RTCIceServer(urls="stun:stun3.l.google.com:19302"),
+                    RTCIceServer(urls="stun:stun4.l.google.com:19302")
+                ])
+                self.pc = RTCPeerConnection(configuration)
+
                 rtsp_url = os.getenv('STREAM_URL')
                 print(f"嘗試連接 RTSP: {rtsp_url}")
-                
+
                 try:
-                    self.player = MediaPlayer(
-                        rtsp_url,
-                        format='rtsp',
-                        options={
-                            'rtsp_transport': 'tcp',
-                            'fflags': 'nobuffer',
-                            'rw_timeout': '5000000',        # 5秒讀寫逾時
-                            'reconnect': '1',               # 重連
-                            'reconnect_streamed': '1',      # 重連串流
-                            'reconnect_delay_max': '10',     # 最大重連延遲
-                            'max_delay': '500000'           # 0.5秒延遲緩衝
-                        }
-                    )
-                    
-                    if not self.player or not self.player.video:
-                        raise Exception("無法獲取視訊軌道")
-                    
+                    # 設置 RTSP 超時
+                    connect_task = asyncio.create_task(self.create_media_player(rtsp_url))
+                    await asyncio.wait_for(connect_task, timeout=5)
+
                     print("成功獲取視訊軌道")
                     self.pc.addTrack(self.player.video)
-                    
+
                     # 處理 WebRTC 協商
                     offer = RTCSessionDescription(sdp=data['sdp'], type=data['type'])
                     await self.pc.setRemoteDescription(offer)
-                    
+
                     answer = await self.pc.createAnswer()
                     await self.pc.setLocalDescription(answer)
-                    
+
                     print("成功創建 answer")
                     await self.send(text_data=json.dumps({
                         'type': 'answer',
                         'sdp': self.pc.localDescription.sdp
                     }))
-                    
+
+                except asyncio.TimeoutError:
+                    error_message = "RTSP 連接超時，無法在 5 秒內建立連線"
+                    print(error_message)
+                    await self.cleanup()
+                    await self.send(text_data=json.dumps({
+                        'type': 'error',
+                        'message': error_message
+                    }))
+
                 except Exception as e:
                     print(f"串流建立錯誤: {str(e)}")
                     await self.cleanup()
@@ -93,13 +99,33 @@ class WebRTCConsumer(AsyncWebsocketConsumer):
                         'type': 'error',
                         'message': str(e)
                     }))
-                    
+
         except Exception as e:
             print(f"一般錯誤: {str(e)}")
             await self.cleanup()
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.cleanup()
+    async def create_media_player(self, rtsp_url):
+        # 驗證 RTSP URL 是否可連接
+        parsed_url = rtsp_url.replace("rtsp://", "").split(":")
+        host = parsed_url[0]
+        port = int(parsed_url[1]) if len(parsed_url) > 1 else 554
+
+        try:
+            with socket.create_connection((host, port), timeout=5):
+                print("RTSP 伺服器可連接，開始初始化 MediaPlayer")
+        except socket.error as e:
+            raise Exception(f"無法連接到 RTSP 伺服器: {str(e)}")
+
+        self.player = MediaPlayer(
+            rtsp_url,
+            format='rtsp',
+            options={
+                'rtsp_transport': 'udp',  # 使用 UDP
+            }
+        )
+        # 確保視訊軌道可用
+        if not self.player or not self.player.video:
+            raise Exception("無法獲取視訊軌道")
 
 class AlertConsumer(AsyncWebsocketConsumer):
     async def connect(self):

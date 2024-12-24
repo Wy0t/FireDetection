@@ -30,7 +30,7 @@
 </head>
 <body>
 
-<h1>即時串流檢視器</h1>
+<h1>災害辨識Demo</h1>
 <video id="video" playsinline autoplay></video>
 <div id="status">狀態：未連接</div>
 <button id="startBtn">開始播放</button>
@@ -60,6 +60,19 @@ startBtn.addEventListener('click', () => {
         console.log("收到 answer，設定 remoteDescription");
         await pc.setRemoteDescription({type: 'answer', sdp: data.sdp});
         statusEl.textContent = "狀態：已獲得 Answer，建立連線中...";
+      }
+
+      if(data.type === 'icecandidate' && pc) {
+        console.log("收到後端 ICE 候選，添加到 RTCPeerConnection");
+        try {
+          await pc.addIceCandidate({
+            sdpMLineIndex: data.sdpMLineIndex,
+            candidate: data.sdp
+          });
+          console.log("成功添加 ICE 候選");
+        } catch (e) {
+          console.error("添加 ICE 候選失敗:", e);
+        }
       }
 
       if(data.type === 'error') {
@@ -96,6 +109,19 @@ async function createOffer() {
       });
       
       statusEl.textContent = "狀態：已收到視訊串流";
+    }
+  });
+
+  // 處理 ICE 候選事件
+  pc.addEventListener('icecandidate', event => {
+    if (event.candidate) {
+      console.log("發現 ICE 候選，發送到後端");
+      ws.send(JSON.stringify({
+        type: 'icecandidate',
+        candidate: event.candidate.candidate,
+        sdpMLineIndex: event.candidate.sdpMLineIndex,
+        sdpMid: event.candidate.sdpMid
+      }));
     }
   });
 
