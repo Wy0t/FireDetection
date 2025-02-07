@@ -54,6 +54,16 @@ class AlertView(APIView):
             message = json_data.get('message', "No message provided")
             detections = json_data.get('detections', [])
 
+            # 判斷是否有任何目標的 score >= 50
+            valid_detections = [
+                obj for obj in detections if obj.get('score', 0) >= 75
+            ]
+            if not valid_detections:
+                return Response({
+                    "status": "success",
+                    "message": "No detections with sufficient score for alert."
+                })
+
             # 獲取圖片
             file_obj = request.FILES['image']
             upload_dir = settings.SERVER_ROOT
@@ -72,7 +82,7 @@ class AlertView(APIView):
                 draw = ImageDraw.Draw(img)
                 font = ImageFont.truetype("arial.ttf", 30)  # 設置字體和大小
 
-                for obj in detections:
+                for obj in valid_detections:
                     # 從 JSON 中獲取邊界框並繪製
                     xmin = obj.get('xMin', 0)
                     ymin = obj.get('yMin', 0)
